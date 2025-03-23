@@ -1,0 +1,6 @@
+/.vscode
+/.VSCodeCounter
+/.idea
+/.env
+/target
+Cargo.lock
