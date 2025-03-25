@@ -26,7 +26,6 @@ async fn main() -> Result<(), BoxError> {
     Ok(())
 }
 
-const DEFAULT_CA: &str = "https://acme-v02.api.letsencrypt.org";
 const DEFAULT_DIRECTORY_URL: &str = "https://acme-v02.api.letsencrypt.org/directory";
 
 type BoxError = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -210,7 +209,6 @@ async fn get_crt(args: &CommandLineArgs) -> Result<String, BoxError> {
         acme_dir,
         disable_check,
         directory_url,
-        ca,
         contact,
         check_port,
         ..
@@ -267,12 +265,6 @@ async fn get_crt(args: &CommandLineArgs) -> Result<String, BoxError> {
     );
 
     log::info!("Getting directory...");
-    let directory_url = if ca != DEFAULT_CA {
-        // backwards compatibility with deprecated CA kwarg
-        format!("{}/directory", ca)
-    } else {
-        directory_url.to_string()
-    };
     let (directory, _, _) = do_request(&directory_url, None).await?;
     log::info!("Directory found!");
 
@@ -425,10 +417,6 @@ struct CommandLineArgs {
     /// certificate authority directory url
     #[arg(long, default_value = DEFAULT_DIRECTORY_URL, value_name = "URL")]
     directory_url: String,
-
-    /// DEPRECATED! USE --directory-url INSTEAD!
-    #[arg(long, default_value = DEFAULT_CA, value_name = "URL")]
-    ca: String,
 
     /// Contact details (e.g. mailto:aaa@bbb.com) for your account-key
     #[arg(long, value_name = "CONTACT", num_args = 0..)]

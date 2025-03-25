@@ -23,7 +23,6 @@ Options:
       --quiet                   suppress output except for errors
       --disable-check           disable checking if the challenge file is hosted correctly
       --directory-url <URL>     certificate authority directory url [default: https://acme-v02.api.letsencrypt.org/directory]
-      --ca <URL>                DEPRECATED! USE --directory-url INSTEAD! [default: https://acme-v02.api.letsencrypt.org]
       --contact [<CONTACT>...]  Contact details (e.g. mailto:aaa@bbb.com) for your account-key
       --check-port <PORT>       what port to use when self-checking the challenge file, default is 80
   -o, --output <FILE>           Output the result to a file
