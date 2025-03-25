@@ -127,13 +127,9 @@ async fn send_signed_request(
         None => String::new(),
     };
 
-    let new_nonce = do_request(directory["newNonce"].as_str().ok_or("No newNonce URL")?, None)
-        .await?
-        .2
-        .get("Replay-Nonce")
-        .ok_or("No Replay-Nonce header")?
-        .to_str()?
-        .to_string();
+    let nonce = directory["newNonce"].as_str().ok_or("No newNonce URL")?;
+    let e = "No Replay-Nonce header";
+    let new_nonce = do_request(nonce, None).await?.2.get("Replay-Nonce").ok_or(e)?.to_str()?.to_string();
 
     let mut protected = Protected {
         url: url.to_string(),
