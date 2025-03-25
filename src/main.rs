@@ -1,11 +1,6 @@
-use base64::{Engine as _, engine::general_purpose};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::HashSet,
-    io::Write,
-    time::{Duration, Instant},
-};
+use std::{collections::HashSet, io::Write};
 
 #[tokio::main]
 async fn main() -> Result<(), BoxError> {
@@ -56,7 +51,7 @@ struct AcmeRequest {
 }
 
 fn b64(data: &[u8]) -> String {
-    general_purpose::URL_SAFE_NO_PAD.encode(data)
+    base64::Engine::encode(&base64::engine::general_purpose::URL_SAFE_NO_PAD, data)
 }
 
 fn sha256(data: &[u8]) -> Vec<u8> {
@@ -101,18 +96,20 @@ pub fn cmd(command: &str, args: &[&str], input: Option<&[u8]>) -> std::io::Resul
 }
 
 // make request and automatically parse json response
-async fn do_request(url: &str, data: Option<&[u8]>) -> Result<(serde_json::Value, u16, reqwest::header::HeaderMap), BoxError> {
+async fn do_request(url: &str, data: Option<&[u8]>) -> std::io::Result<(serde_json::Value, u16, reqwest::header::HeaderMap)> {
     let client = reqwest::Client::new();
     let request = if let Some(data) = data {
         client.post(url).header("Content-Type", "application/jose+json").body(data.to_vec())
     } else {
         client.get(url)
     };
-    let response = request.header("User-Agent", env!("CARGO_PKG_NAME")).send().await?;
+    let f = |info, e| std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to {} {}: {}", info, url, e));
+    let pk = env!("CARGO_PKG_NAME");
+    let response = request.header("User-Agent", pk).send().await.map_err(|e| f("send request to", e))?;
     let status = response.status().as_u16();
     let headers = response.headers().clone();
-    let text = response.text().await?;
-    let json: serde_json::Value = serde_json::from_str(&text).unwrap_or(serde_json::Value::String(text));
+    let text = response.text().await.map_err(|e| f("get response text from", e))?;
+    let json = serde_json::from_str(&text).unwrap_or(serde_json::Value::String(text));
 
     Ok((json, status, headers))
 }
@@ -184,17 +181,17 @@ async fn poll_until_not(
     jwk: &Jwk,
     alg: &str,
 ) -> Result<serde_json::Value, BoxError> {
-    let start = Instant::now();
+    let start = std::time::Instant::now();
     let mut result: Option<serde_json::Value> = None;
 
     while result.is_none() || pending_statuses.contains(&result.as_ref().ok_or("No result")?["status"].as_str().ok_or("No status")?) {
         // 1 hour timeout
-        if start.elapsed() >= Duration::from_secs(3600) {
+        if start.elapsed() >= std::time::Duration::from_secs(3600) {
             return Err("Polling timeout".into());
         }
 
         if result.is_some() {
-            tokio::time::sleep(Duration::from_secs(2)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(2)).await;
         }
 
         let (resp_data, _, _) = send_signed_request(url, None, account_key, directory, acct_headers, jwk, alg, 0).await?;
@@ -255,10 +252,8 @@ async fn get_crt(args: &CommandLineArgs) -> Result<String, BoxError> {
             }
         }
     }
-    log::info!(
-        "Found domains: {}",
-        domains.iter().map(|d| d.to_owned()).collect::<Vec<_>>().join(", ")
-    );
+    let info = domains.iter().map(|d| d.to_owned()).collect::<Vec<_>>().join(", ");
+    log::info!("Found domains: {info}");
 
     log::info!("Getting directory...");
     let (directory, _, _) = do_request(directory_url, None).await?;
@@ -298,10 +293,8 @@ async fn get_crt(args: &CommandLineArgs) -> Result<String, BoxError> {
 
     log::info!("Creating new order...");
     let url = directory["newOrder"].as_str().ok_or("No newOrder URL")?;
-    let payload =
-        serde_json::json!({"identifiers": domains.iter().map(|d| serde_json::json!({"type": "dns", "value": d})).collect::<Vec<_>>()});
-    let (order, _, order_headers) =
-        send_signed_request(url, Some(&payload), account_key, &directory, Some(&acct_headers), &jwk, alg, 0).await?;
+    let pl = serde_json::json!({"identifiers": domains.iter().map(|d| serde_json::json!({"type": "dns", "value": d})).collect::<Vec<_>>()});
+    let (order, _, order_headers) = send_signed_request(url, Some(&pl), account_key, &directory, Some(&acct_headers), &jwk, alg, 0).await?;
     log::info!("Order created!");
 
     // get the authorizations that need to be completed
