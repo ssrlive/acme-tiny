@@ -18,7 +18,11 @@ async fn main() -> Result<(), BoxError> {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(default)).init();
 
     let signed_crt = get_crt(&args).await?;
-    print!("{}", signed_crt);
+    if let Some(output) = args.output {
+        std::fs::write(output, signed_crt)?;
+    } else {
+        print!("{}", signed_crt);
+    }
     Ok(())
 }
 
@@ -433,6 +437,10 @@ struct CommandLineArgs {
     /// what port to use when self-checking the challenge file, default is 80
     #[arg(long, value_name = "PORT")]
     check_port: Option<u16>,
+
+    /// Output the result to a file
+    #[arg(short, long, value_name = "FILE")]
+    output: Option<std::path::PathBuf>,
 }
 
 macro_rules! version_info_macro {
