@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::HashSet,
     io::Write,
-    path::Path,
     time::{Duration, Instant},
 };
 
@@ -212,6 +211,8 @@ async fn get_crt(args: &CommandLineArgs) -> Result<String, BoxError> {
         check_port,
         ..
     } = args;
+    let account_key = account_key.to_str().ok_or("No account key path")?;
+    let csr = csr.to_str().ok_or("No CSR path")?;
 
     log::info!("Parsing account key...");
     let out = cmd("openssl", &["rsa", "-in", account_key, "-noout", "-text"], None)?;
@@ -335,7 +336,7 @@ async fn get_crt(args: &CommandLineArgs) -> Result<String, BoxError> {
 
         let token = re_token.replace_all(challenge["token"].as_str().ok_or("No token")?, "_");
         let keyauthorization = format!("{}.{}", token, thumbprint);
-        let wellknown_path = Path::new(acme_dir).join(&*token);
+        let wellknown_path = acme_dir.join(&*token);
 
         std::fs::File::create(&wellknown_path)?.write_all(keyauthorization.as_bytes())?;
 
@@ -398,16 +399,16 @@ async fn get_crt(args: &CommandLineArgs) -> Result<String, BoxError> {
 #[command(author, version = version_info(), long_about = None, about = about_info())]
 struct CommandLineArgs {
     /// path to your Let's Encrypt account private key
-    #[arg(long, value_name = "FILE", required = true)]
-    account_key: String,
+    #[arg(short, long, value_name = "FILE", required = true)]
+    account_key: std::path::PathBuf,
 
     /// path to your certificate signing request
-    #[arg(long, value_name = "FILE", required = true)]
-    csr: String,
+    #[arg(short, long, value_name = "FILE", required = true)]
+    csr: std::path::PathBuf,
 
     /// path to the .well-known/acme-challenge/ directory
-    #[arg(long, value_name = "DIR", required = true)]
-    acme_dir: String,
+    #[arg(short = 'd', long, value_name = "DIR", required = true)]
+    acme_dir: std::path::PathBuf,
 
     /// suppress output except for errors
     #[arg(long)]
