@@ -59,6 +59,12 @@ fn b64(data: &[u8]) -> String {
     general_purpose::URL_SAFE_NO_PAD.encode(data)
 }
 
+fn sha256(data: &[u8]) -> Vec<u8> {
+    let mut hasher = <::sha2::Sha256 as ::sha2::Digest>::new();
+    ::sha2::Digest::update(&mut hasher, data);
+    ::sha2::Digest::finalize(hasher).to_vec()
+}
+
 pub fn cmd(command: &str, args: &[&str], input: Option<&[u8]>) -> std::io::Result<Vec<u8>> {
     let full_cmd = format!("{} {}", command, args.join(" "));
     log::debug!("Running command: \"{full_cmd}\"...");
@@ -231,13 +237,7 @@ async fn get_crt(args: &CommandLineArgs) -> Result<String, BoxError> {
     };
 
     let accountkey_json = serde_json::to_string(&jwk)?;
-
-    let thumbprint = {
-        let mut hasher = <::sha2::Sha256 as ::sha2::Digest>::new();
-        ::sha2::Digest::update(&mut hasher, accountkey_json.as_bytes());
-        let hash_result = ::sha2::Digest::finalize(hasher);
-        b64(&hash_result)
-    };
+    let thumbprint = b64(&sha256(accountkey_json.as_bytes()));
 
     log::info!("Parsing CSR...");
     let out = cmd("openssl", &["req", "-in", csr, "-noout", "-text"], None)?;
@@ -261,7 +261,7 @@ async fn get_crt(args: &CommandLineArgs) -> Result<String, BoxError> {
     );
 
     log::info!("Getting directory...");
-    let (directory, _, _) = do_request(&directory_url, None).await?;
+    let (directory, _, _) = do_request(directory_url, None).await?;
     log::info!("Directory found!");
 
     // create account, update contact details (if any), and set the global key identifier
