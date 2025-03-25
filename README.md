@@ -12,7 +12,7 @@ acme-tiny -h
 
 Automates getting a signed TLS certificate from Let's Encrypt using the ACME protocol.
 It will need to be run on your server and have access to your private account key.
-Version: 0.1.1 (beda80a 2025-03-25 01:22:36)
+Version: 0.1.3 (451f2d2 2025-03-25 10:33:56)
 
 Usage: acme-tiny [OPTIONS] --account-key <FILE> --csr <FILE> --acme-dir <DIR>
 
