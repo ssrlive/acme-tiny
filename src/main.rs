@@ -203,7 +203,7 @@ async fn get_crt(args: &CommandLineArgs) -> Result<String, BoxError> {
         account_key,
         csr,
         acme_dir,
-        disable_check,
+        check_challenge,
         directory_url,
         contact,
         check_port,
@@ -333,7 +333,7 @@ async fn get_crt(args: &CommandLineArgs) -> Result<String, BoxError> {
         std::fs::File::create(&wellknown_path)?.write_all(keyauthorization.as_bytes())?;
 
         // check that the file is in place
-        if !disable_check {
+        if check_challenge.unwrap_or(true) {
             let port = if let Some(port) = check_port {
                 format!(":{}", port)
             } else {
@@ -406,9 +406,9 @@ struct CommandLineArgs {
     #[arg(long)]
     quiet: bool,
 
-    /// disable checking if the challenge file is hosted correctly
-    #[arg(long)]
-    disable_check: bool,
+    /// checking if the challenge file is hosted correctly
+    #[arg(long, value_name = "BOOL")]
+    check_challenge: Option<bool>,
 
     /// certificate authority directory url
     #[arg(long, default_value = DEFAULT_DIRECTORY_URL, value_name = "URL")]

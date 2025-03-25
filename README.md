@@ -21,7 +21,7 @@ Options:
   -c, --csr <FILE>              path to your certificate signing request
   -d, --acme-dir <DIR>          path to the .well-known/acme-challenge/ directory
       --quiet                   suppress output except for errors
-      --disable-check           disable checking if the challenge file is hosted correctly
+      --check-challenge <BOOL>  checking if the challenge file is hosted correctly [possible values: true, false]
       --directory-url <URL>     certificate authority directory url [default: https://acme-v02.api.letsencrypt.org/directory]
       --contact [<CONTACT>...]  Contact details (e.g. mailto:aaa@bbb.com) for your account-key
       --check-port <PORT>       what port to use when self-checking the challenge file, default is 80
