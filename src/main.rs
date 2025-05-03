@@ -1,4 +1,6 @@
 use regex::Regex;
+use ring::{digest, rand, signature};
+use rsa::{RsaPrivateKey, pkcs8::DecodePrivateKey, pkcs8::EncodePrivateKey};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, io::Write};
 
@@ -55,11 +57,15 @@ fn b64(data: &[u8]) -> String {
 }
 
 fn sha256(data: &[u8]) -> Vec<u8> {
+    /*
     let mut hasher = <::sha2::Sha256 as ::sha2::Digest>::new();
     ::sha2::Digest::update(&mut hasher, data);
     ::sha2::Digest::finalize(hasher).to_vec()
+    // */
+    digest::digest(&digest::SHA256, data).as_ref().to_vec()
 }
 
+//*
 pub fn cmd(command: &str, args: &[&str], input: Option<&[u8]>) -> std::io::Result<Vec<u8>> {
     let full_cmd = format!("{} {}", command, args.join(" "));
     log::debug!("Running command: \"{full_cmd}\"...");
@@ -94,7 +100,7 @@ pub fn cmd(command: &str, args: &[&str], input: Option<&[u8]>) -> std::io::Resul
     }
     Ok(out.stdout)
 }
-
+// */
 // make request and automatically parse json response
 async fn do_request(url: &str, data: Option<&[u8]>) -> std::io::Result<(serde_json::Value, u16, reqwest::header::HeaderMap)> {
     let client = reqwest::Client::new();
@@ -114,11 +120,24 @@ async fn do_request(url: &str, data: Option<&[u8]>) -> std::io::Result<(serde_js
     Ok((json, status, headers))
 }
 
+fn sign_sha265_rsa<T: AsRef<std::path::Path>>(private_key: T, data: &[u8]) -> Result<Vec<u8>, BoxError> {
+    let private_key_pem = std::fs::read_to_string(private_key)?;
+    let private_key = RsaPrivateKey::from_pkcs8_pem(&private_key_pem)?;
+    let private_key_der = private_key.to_pkcs8_der()?.as_bytes().to_vec();
+    let key_pair = signature::RsaKeyPair::from_pkcs8(&private_key_der).map_err(|e| format!("Failed to create key pair: {}", e))?;
+    let rng = rand::SystemRandom::new();
+    let mut signature = vec![0; key_pair.public().modulus_len()];
+    key_pair
+        .sign(&signature::RSA_PKCS1_SHA256, &rng, data, &mut signature)
+        .map_err(|e| format!("Failed to sign: {}", e))?;
+    Ok(signature)
+}
+
 #[allow(clippy::too_many_arguments)]
-async fn send_signed_request(
+async fn send_signed_request<T: AsRef<std::path::Path>>(
     url: &str,
     payload: Option<&serde_json::Value>,
-    account_key: &str,
+    account_key: T,
     directory: &serde_json::Value,
     acct_headers: Option<&reqwest::header::HeaderMap>,
     jwk: &Jwk,
@@ -149,7 +168,9 @@ async fn send_signed_request(
     let protected64 = b64(serde_json::to_string(&protected)?.as_bytes());
     let protected_input = format!("{}.{}", protected64, payload64).into_bytes();
 
-    let signature = b64(&cmd("openssl", &["dgst", "-sha256", "-sign", account_key], Some(&protected_input))?);
+    // let signature = b64(&cmd("openssl", &["dgst", "-sha256", "-sign", account_key], Some(&protected_input))?);
+    let signature = b64(&sign_sha265_rsa(&account_key, &protected_input)?);
+
     let request = AcmeRequest {
         protected: protected64,
         payload: payload64,
@@ -162,6 +183,7 @@ async fn send_signed_request(
     if depth < 100 && code == 400 && resp_data["type"] == "urn:ietf:params:acme:error:badNonce" {
         let d = depth + 1;
         log::debug!("Retrying request due to bad nonce, attempt {}", d);
+        let account_key = account_key.as_ref().to_str().unwrap();
         return Box::pin(send_signed_request(url, payload, account_key, directory, acct_headers, jwk, alg, d)).await;
     }
 

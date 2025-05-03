@@ -17,8 +17,11 @@ reqwest = { version = "0.12", default-features = false, features = [
 ] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-sha2 = "0.10"
 tokio = { version = "1.0", features = ["full"] }
+ring = "0.17"
+rsa = "0.9"
+x509-parser = "0.17"
+rcgen = "0.13"
 
 [build-dependencies]
 chrono = "0.4"
