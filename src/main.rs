@@ -1,6 +1,11 @@
 use regex::Regex;
 use ring::{digest, rand, signature};
-use rsa::{RsaPrivateKey, pkcs8::DecodePrivateKey, pkcs8::EncodePrivateKey};
+use rsa::{
+    RsaPrivateKey,
+    pkcs1::DecodeRsaPrivateKey,
+    pkcs8::{DecodePrivateKey, EncodePrivateKey},
+    traits::PublicKeyParts,
+};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashSet, io::Write};
 
@@ -223,6 +228,25 @@ async fn poll_until_not(
     Ok(result.ok_or("No result")?)
 }
 
+fn extract_rsa_public_key_info<T: AsRef<std::path::Path>>(account_key: T) -> Result<(String, String), BoxError> {
+    let private_key_pem = std::fs::read_to_string(account_key)?;
+
+    // try to parse PKCS#8 or PKCS#1
+    let private_key = match RsaPrivateKey::from_pkcs8_pem(&private_key_pem) {
+        Ok(key) => key,
+        Err(_) => RsaPrivateKey::from_pkcs1_pem(&private_key_pem)?,
+    };
+
+    let public_key = private_key.to_public_key();
+    let n = public_key.n();
+    let e = public_key.e();
+
+    let n_hex = format!("{:x}", n).trim_start_matches('0').to_string();
+    let e_decimal = e.to_string();
+
+    Ok((n_hex, e_decimal))
+}
+
 async fn get_crt(args: &CommandLineArgs) -> Result<String, BoxError> {
     let CommandLineArgs {
         account_key,
@@ -238,12 +262,17 @@ async fn get_crt(args: &CommandLineArgs) -> Result<String, BoxError> {
     let csr = csr.to_str().ok_or("No CSR path")?;
 
     log::info!("Parsing account key...");
+    /*
     let out = cmd("openssl", &["rsa", "-in", account_key, "-noout", "-text"], None)?;
     let out_str = String::from_utf8(out)?;
     let pub_pattern = Regex::new(r"modulus:[\s]+?00:([a-f0-9\:\s]+?)\npublicExponent: ([0-9]+)")?;
     let captures = pub_pattern.captures(&out_str).ok_or("No public key")?;
     let pub_hex = captures.get(1).ok_or("No public key hex")?.as_str();
     let mut pub_exp = format!("{:x}", captures[2].parse::<i64>()?);
+    // */
+    let (pub_hex, pub_exp_decimal) = extract_rsa_public_key_info(account_key)?;
+    let mut pub_exp = format!("{:x}", pub_exp_decimal.parse::<i64>()?);
+
     if pub_exp.len() % 2 != 0 {
         pub_exp = format!("0{}", pub_exp);
     }
