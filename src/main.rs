@@ -9,14 +9,14 @@ async fn main() -> Result<(), BoxError> {
 
     use log::LevelFilter::{Error, Trace};
     let v = if args.quiet { Error } else { Trace };
-    let default = format!("{}={:?}", module_path!(), v);
+    let default = format!("{}={v:?}", module_path!());
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or(default)).init();
 
     let signed_crt = get_crt(&args).await?;
     if let Some(output) = args.output {
         std::fs::write(output, signed_crt)?;
     } else {
-        print!("{}", signed_crt);
+        print!("{signed_crt}");
     }
     Ok(())
 }
@@ -90,7 +90,7 @@ pub fn cmd(command: &str, args: &[&str], input: Option<&[u8]>) -> std::io::Resul
         let err = String::from_utf8_lossy(if out.stderr.is_empty() { &out.stdout } else { &out.stderr });
         let info = format!("Run command: \"{full_cmd}\" not success with \"{}\"", err.trim());
         log::error!("{}", info);
-        return Err(std::io::Error::new(std::io::ErrorKind::Other, info));
+        return Err(std::io::Error::other(info));
     }
     Ok(out.stdout)
 }
@@ -103,7 +103,7 @@ async fn do_request(url: &str, data: Option<&[u8]>) -> std::io::Result<(serde_js
     } else {
         client.get(url)
     };
-    let f = |info, e| std::io::Error::new(std::io::ErrorKind::Other, format!("Failed to {} {}: {}", info, url, e));
+    let f = |info, e| std::io::Error::other(format!("Failed to {} {}: {}", info, url, e));
     let pk = env!("CARGO_PKG_NAME");
     let response = request.header("User-Agent", pk).send().await.map_err(|e| f("send request to", e))?;
     let status = response.status().as_u16();
@@ -281,7 +281,9 @@ async fn get_crt(args: &CommandLineArgs) -> Result<String, BoxError> {
         let (account, _, _) = send_signed_request(&url, Some(&payload), account_key, &directory, Some(&acct_headers), &jwk, alg, 0).await?;
         log::info!(
             "Updated contact details:\n{}",
-            account["contact"]
+            account
+                .get("contact")
+                .ok_or("No contact field")?
                 .as_array()
                 .ok_or("No contact array")?
                 .iter()
