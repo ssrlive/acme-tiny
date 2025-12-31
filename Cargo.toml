@@ -4,24 +4,24 @@ version = "0.1.3"
 edition = "2024"
 
 [dependencies]
-base64 = "0.22"
-clap = { version = "4.0", features = ["derive", "wrap_help"] }
-dotenvy = "0.15"
-env_logger = "0.11"
-hex = "0.4"
-log = "0.4"
-regex = "1"
-reqwest = { version = "0.12", default-features = false, features = [
-    "rustls-tls",
+base64 = "0.22.1"
+clap = { version = "4.5.53", features = ["derive", "wrap_help"] }
+dotenvy = "0.15.7"
+env_logger = "0.11.8"
+hex = "0.4.3"
+log = "0.4.29"
+rcgen = "0.14.6"
+regex = "1.12.2"
+reqwest = { version = "0.13.1", default-features = false, features = [
+    "rustls",
     "json",
 ] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-tokio = { version = "1.0", features = ["full"] }
-ring = "0.17"
-rsa = { version = "0.9", default-features = false, features = ["pem", "std"] }
-x509-parser = "0.17"
-rcgen = "0.13"
+ring = "0.17.14"
+rsa = { version = "0.9.9", default-features = false, features = ["pem", "std"] }
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.148"
+tokio = { version = "1.48.0", features = ["full"] }
+x509-parser = "0.18.0"
 
 [build-dependencies]
-chrono = "0.4"
+chrono = "0.4.42"
